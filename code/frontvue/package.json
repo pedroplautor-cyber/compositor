@@ -2,7 +2,7 @@
   "name": "front",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://pedroplautor-cyber.github.io/compositor",
+  "homepage": "https://pedroplautor-cyber.github.io",
 
   "scripts": {
     "serve": "vue-cli-service serve",
