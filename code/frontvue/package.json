@@ -2,10 +2,14 @@
   "name": "front",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://pedroplautor-cyber.github.io/compositor",
+
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.17.1",
@@ -55,6 +59,7 @@
     "@vue/cli-service": "~5.0.0",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
+    "gh-pages": "^6.3.0",
     "leaflet": "^1.9.4",
     "vue-cli-plugin-vuetify": "~2.5.8",
     "webpack-plugin-vuetify": "^2.0.0-alpha.0"
@@ -79,4 +84,5 @@
     "not dead",
     "not ie 11"
   ]
+
 }
