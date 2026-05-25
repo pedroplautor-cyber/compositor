@@ -14,6 +14,7 @@
             <button class="dropdown-item" @click="copyClipboard">Copiar al Portapapeles</button>
             <button class="dropdown-item" @click="$refs.importInput.click()">Importar TXT</button>
             <button class="dropdown-item midi-item" @click="exportMidi">Exportar MIDI</button>
+            <button class="dropdown-item midi-item" @click="exportPartitura">Exportar Partitura</button>
           </div>
         </div>
 
@@ -203,6 +204,7 @@
 import Parser from '@/utils/parser.js';
 import AudioEngine from '@/utils/audio.js';
 import MidiExport from '@/utils/midi.js';
+import { PartituraExport }  from '@/utils/partitura.js';
 
 export default {
   name: 'EditorScreen',
@@ -437,6 +439,48 @@ export default {
       a.download = `${this.localSong.title}.mid`; a.click();
       this.showStatus('✔ MIDI exportado');
     },
+
+    exportPartitura() {
+      try {
+        const { melody, harmony } = Parser.parseMeasures(
+          this.localSong.measures.map(m => m.text),
+          this.localSong.bpm
+        );
+
+        // Generamos el contenido del PDF
+        const pdfData = PartituraExport.exportToPartitura({
+          title: this.localSong.title,
+          bpm: this.localSong.bpm,
+          timeSignature: this.localSong.timeSignature,
+          measureMelody: melody,
+          measureHarmony: harmony,
+          includeHarmony: true,
+          separateChannels: false
+        });
+
+        // Creamos el Blob con el tipo MIME correcto para PDF
+        const blob = new Blob([pdfData], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+
+        // Creamos el elemento de descarga invisible
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.localSong.title || 'partitura'}.pdf`; 
+        
+        // Añadimos al documento, hacemos click y limpiamos la memoria
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.showStatus('✔ Partitura PDF exportada');
+      } catch (error) {
+        console.error("Error al exportar PDF:", error);
+        this.showStatus('❌ Error al exportar PDF');
+      }
+    },
+
+
 
     showStatus(msg) {
       this.statusMsg = msg;
