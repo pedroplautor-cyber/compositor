@@ -58,8 +58,9 @@ export default {
         percKit: 'classic',
         customImageSrc: null,
         measures: [
-          { id: 1, text: 'DO2 DO4 RE4 | [DO MI SOL]2 _2' },
-          { id: 2, text: 'MI4 FA4 SOL2 | RE2 SOL2' },
+          { id: 1, text: 'do2. SOL#4 | DO1'},
+          { id: 2, text: 'DO2 DO4 RE4 | [DO MI SOL]2 _2' },
+          { id: 3, text: 'MI4 FA4 SOL2 | RE2 SOL2' },
         ]
       }
     };
