@@ -32,6 +32,13 @@
           </button>
         </div>
 
+        <div class="nav-item">
+          <button class="nav-btn" :class="{ 'active-btn': showTimbres }" @click="createRandomMusic">
+            Canción aleatoria
+          </button>
+        </div>
+
+
         <!-- Opción Ayuda (Popup) -->
         <div class="nav-item">
           <button class="nav-btn" :class="{ 'active-btn': showHelp }" @click="showHelp = true">
@@ -53,41 +60,30 @@
       <div class="status-bar">{{ statusMsg }}</div>
     </div>
 
-    <!-- COMPASES -->
-    <section class="editor-section measures-section">
-      <div class="section-label">Estructura de Compases</div>
-      <div class="measures-list" ref="measuresList">
-        <div
-          v-for="(measure, i) in localSong.measures"
-          :key="measure.id"
-          :class="['measure-card', getMeasureStatus(measure.text)]"
-        >
-          <div class="measure-head">
-            <span class="measure-num">c. {{ i + 1 }}</span>
-            <span class="beat-counter">{{ getBeatDisplay(measure.text) }}</span>
-            <div class="measure-actions">
-              <button class="action-btn play-btn" @click="playMeasure(measure.text)" title="Escuchar compás">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-              </button>
-              <button class="action-btn del-btn" @click="removeMeasure(i)" title="Eliminar">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-          </div>
-          <textarea
-            class="measure-input"
-            v-model="measure.text"
-            @input="emit()"
-            rows="2"
-            spellcheck="false"
-            autocorrect="off"
-            autocapitalize="characters"
-            placeholder="Introduce notas..."
-          ></textarea>
-        </div>
-      </div>
-      <button class="btn-add-measure" @click="addMeasure()">+ Añadir nuevo compás</button>
-    </section>
+    <!-- COMPASES
+    <MeasureCard
+      v-for="(measure, i) in localSong.measures"
+      :key="measure.id"
+      :measure="measure"
+      :index="i"
+      :get-measure-status="getMeasureStatus"
+      :get-beat-display="getBeatDisplay"
+      @play="playMeasure"
+      @remove="removeMeasure"
+      @update:text="actualizarTextoCompas(measure, $event)" 
+    />-->
+
+
+    <MeasureCard
+      :song="localSong"
+      @update:song="localSong = $event; emit();" 
+      @play="playSingleMeasure"
+      :get-measure-status="getMeasureStatus"
+      :get-beat-display="getBeatDisplay"
+    />
+
+
+
 
     <!-- POPUP: AJUSTES GENERALES -->
     <transition name="fade">
@@ -205,11 +201,13 @@ import Parser from '@/utils/parser.js';
 import AudioEngine from '@/utils/audio.js';
 import MidiExport from '@/utils/midi.js';
 import { PartituraExport }  from '@/utils/partitura.js';
+import MeasureCard from './MeasureCard.vue';
 
 export default {
   name: 'EditorScreen',
   props: ['song'],
   emits: ['update:song', 'play'],
+  components: {MeasureCard},
 
   data() {
     return {
@@ -236,7 +234,105 @@ export default {
   },
 
   methods: {
+
+createRandomMusic() {
+    // 1. Bancos de datos para generar contenido musical variado estilo tu formato
+    const notas = ['DO4', 'RE4', 'MI4', 'FA4', 'SOL4', 'LA4', 'SI4', 'DO5'];
+    const alteraciones = ['', '#', 'b'];
+    const figuras = ['2', '4', '8', '.'];
+    const acordes = ['[DO MI SOL]', '[FA LA DO]', '[SOL SI RE]', '[MI SOL SI]'];
+
+    const measures = [];
+
+    // 2. Generar exactamente 4 compases
+    for (let i = 1; i <= 4; i++) {
+      const eventosParteA = [];
+      const eventosParteB = [];
+
+      // Generamos 2 o 3 eventos para la primera mitad del compás (antes del '|')
+      const numEventosA = Math.floor(Math.random() * 2) + 2;
+      for (let j = 0; j < numEventosA; j++) {
+        // Decidir aleatoriamente si es nota, acorde o silencio
+        const tipo = Math.random();
+        if (tipo < 0.6) {
+          // Nota simple (ej: RE#4)
+          const nota = notas[Math.floor(Math.random() * notas.length)];
+          const alt = alteraciones[Math.floor(Math.random() * alteraciones.length)];
+          // Insertamos la alteración antes del número de octava
+          const notaFormateada = nota.replace(/\d/, match => alt + match);
+          eventosParteA.push(notaFormateada);
+        } else if (tipo < 0.85) {
+          // Acorde con duración (ej: [DO MI SOL]2)
+          const acorde = acordes[Math.floor(Math.random() * acordes.length)];
+          const figura = figuras[Math.floor(Math.random() * figuras.length)];
+          eventosParteA.push(`${acorde}${figura}`);
+        } else {
+          // Silencio (ej: _2)
+          const figura = figuras[Math.floor(Math.random() * figuras.length)];
+          eventosParteA.push(`_${figura}`);
+        }
+      }
+
+      // Generamos 2 o 3 eventos para la segunda mitad del compás (después del '|')
+      const numEventosB = Math.floor(Math.random() * 2) + 2;
+      for (let k = 0; k < numEventosB; k++) {
+        const nota = notas[Math.floor(Math.random() * notas.length)];
+        const figura = figuras[Math.floor(Math.random() * figuras.length)];
+        eventosParteB.push(`${nota}${figura}`);
+      }
+
+      // Unimos todo usando el separador '|' de tu formato
+      const textoCompas = `${eventosParteA.join(' ')} | ${eventosParteB.join(' ')}`;
+
+      measures.push({
+        id: i, // ID numérico secuencial como tu ejemplo
+        text: textoCompas
+      });
+    }
+
+    // 3. Construir el objeto con la estructura estricta requerida
+    const randomSong = {
+      title: "MELODÍA ALEATORIA",
+      bpm: 100,
+      timeSignature: "4/4",
+      bandMode: "duet",
+      melodyTimbre: "triangle",
+      percKit: "classic",
+      customImageSrc: null,
+      measures: measures
+    };
+
+    // 4. Asignar la canción al estado del padre
+    this.localSong = randomSong;
+  },
+
+
+playSingleMeasure(measureData) {
+    // measureData contiene { text: "C4 D4 E4", index: 0 }
+    const textoDelCompas = measureData.text;
+    
+    // AQUÍ: Llama a tu motor de sonido (Tone.js, AudioContext, etc.)
+    // pasándole SOLAMENTE 'textoDelCompas', en lugar de toda la canción.
+    this.playMeasure(textoDelCompas); 
+  },
+
+
+  actualizarTextoCompas(measure, nuevoTexto) {
+      // 1. Modifica los datos locales del padre (localSong)
+      measure.text = nuevoTexto;
+      
+      // 2. Notifica al componente superior (el abuelo) enviando la información actualizada
+      // Cambia 'change' por el nombre del evento que escuche tu componente global si es distinto
+      //this.$emit('change', this.localSong); 
+      this.$emit('update:song', JSON.parse(JSON.stringify(this.localSong)));
+      
+      // NOTA: Si antes tenías exactamente @input="emit()", lo equivalente en Options API es:
+      // this.$emit('input');
+    },
+
+
     emit() {
+      //alert("Emito: " + JSON.stringify(this.localSong) )
       this.$emit('update:song', JSON.parse(JSON.stringify(this.localSong)));
     },
 
@@ -251,7 +347,7 @@ export default {
     getBeatDisplay(text) {
       const total = this.countBeats(text);
       const target = this.getTargetBeats();
-      return `${total.toFixed(2).replace('.00', '')} / ${target} pulsos`;
+      return `${total.toFixed(2).replace('.00', '')} / ${target}`;
     },
 
     getMeasureStatus(text) {

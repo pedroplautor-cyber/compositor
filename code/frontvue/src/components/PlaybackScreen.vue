@@ -45,7 +45,7 @@ export default {
       notesTimeline: [], 
       activeNotes: new Set(), 
 
-      // CONFIGURACIÓN CORREGIDA PARA 5 OCTAVAS (C2 a B6)
+      // CONFIGURACIÓN PARA 5 OCTAVAS (C2 a B6)
       startMidi: 36,  // C2
       endMidi: 95,    // B6
       totalNotes: 60, // 5 octavas * 12 notas
@@ -141,7 +141,7 @@ export default {
                     midi,
                     start: harTimeOffset,
                     duration: note.duration,
-                    color: '#2563eb' // Azul nítido para acompañamiento
+                    color: '#2563eb' 
                   });
                 }
                 AudioEngine.createMelodySound(ctx, n.freq, noteStartAudioTime, note.duration, 0.10,
@@ -212,13 +212,12 @@ export default {
         }
       };
 
-      // 1. RENDERIZAR NOTAS (ESTILO RECTÁNGULO SHARP)
+      // 1. RENDERIZAR NOTAS DE LA CASCADA
       this.notesTimeline.forEach(note => {
         const noteBottomY = waterfallHeight - (note.start - songCurrentTime) * speed;
         const noteTopY = noteBottomY - (note.duration * speed);
         let noteHeight = noteBottomY - noteTopY;
 
-        // Evitar que micro-notas desaparezcan visualmente
         if (noteHeight < 4) noteHeight = 4;
 
         if (noteBottomY > 0 && noteTopY < waterfallHeight) {
@@ -226,23 +225,18 @@ export default {
           const w = this.isBlackKey(note.midi) ? blackKeyWidth : whiteKeyWidth - 2;
 
           ctx.save();
-          
-          // Máscara para que no se superpongan al piano
           ctx.beginPath();
           ctx.rect(0, 0, W, waterfallHeight);
           ctx.clip();
 
-          // Estado activo (Brillo e iluminación)
           const isActive = this.activeNotes.has(note.midi);
-          
           if (isActive) {
             ctx.shadowBlur = 10;
             ctx.shadowColor = note.color;
           }
 
-          // CORRECCIÓN: Dibujo del bloque con esquinas apenas suavizadas (3px) para mantener la forma rectangular
+          // Ajuste de dibujo fino para coincidir con la geometría exacta de las teclas
           this.drawNoteBlock(ctx, x + 1, noteTopY, w, noteHeight, 3, note.color);
-          
           ctx.restore();
         }
       });
@@ -251,7 +245,7 @@ export default {
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(0, waterfallHeight - 4, W, 4);
 
-      // 2. TECLAS BLANCAS
+      // 2. RENDERIZAR TECLAS BLANCAS
       let currentWhiteIdx = 0;
       for (let m = this.startMidi; m <= this.endMidi; m++) {
         if (!this.isBlackKey(m)) {
@@ -268,7 +262,7 @@ export default {
         }
       }
 
-      // 3. TECLAS NEGRAS
+      // 3. RENDERIZAR TECLAS NEGRAS CORREGIDAS
       currentWhiteIdx = 0;
       for (let m = this.startMidi; m <= this.endMidi; m++) {
         if (this.isBlackKey(m)) {
@@ -283,30 +277,32 @@ export default {
             ctx.fillRect(x, waterfallHeight, blackKeyWidth, 4);
           }
         } else {
-          if (m !== this.startMidi) currentWhiteIdx++;
+          // CORRECCIÓN AQUÍ: Se incrementa siempre que pasamos por una blanca,
+          // eliminando la condición redundante (m !== this.startMidi) que provocaba el desfase de 2 semitonos.
+          currentWhiteIdx++;
         }
       }
     },
 
-    // NUEVO RENDERIZADOR DE BLOQUES DE NOTA RECTANGULARES
     drawNoteBlock(ctx, x, y, width, height, radius, baseColor) {
+      // Prevenir errores visuales si la altura calculada es menor que el radio de redondeado
+      if (height < radius * 2) radius = height / 2;
+
       ctx.beginPath();
       ctx.moveTo(x + radius, y);
       ctx.lineTo(x + width - radius, y);
       ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
       ctx.lineTo(x + width, y + height - radius);
       ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-      ctx.lineTo(x + radius, y + height - radius);
+      ctx.lineTo(x + radius, y + height);
       ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
       ctx.lineTo(x, y + radius);
       ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.closePath();
       
-      // Relleno principal
       ctx.fillStyle = baseColor;
       ctx.fill();
 
-      // Contorno fino interior oscuro para definición de bloques (Estilo Synthesia)
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)';
       ctx.stroke();
