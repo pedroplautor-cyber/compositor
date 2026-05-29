@@ -483,44 +483,113 @@ playSingleMeasure(measureData) {
       this.emit();
     },
 
-    exportTxt() {
+
+exportTxt() {
+      // 1. Cabecera con datos básicos de la canción
       let c = `${this.localSong.title}|BPM:${this.localSong.bpm}|TS:${this.localSong.timeSignature}\n`;
-      this.localSong.measures.forEach(m => c += m.text + '\n');
+      
+      // 2. Nueva línea de metadato: Guardamos el timeline completo serializado en una sola línea especial (empezando con #TIMELINE:)
+      const timelineData = this.localSong.timeline ? JSON.stringify(this.localSong.timeline) : '[]';
+      c += `#TIMELINE:${timelineData}\n`;
+      
+      // 3. Guardamos los compases únicos con su ID para poder re-vincular el timeline al importar
+      this.localSong.measures.forEach(m => {
+        c += `${m.id}|${m.text}\n`;
+      });
+      
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([c], { type: 'text/plain' }));
-      a.download = `${this.localSong.title}.txt`; a.click();
+      a.download = `${this.localSong.title}.txt`; 
+      a.click();
     },
 
     copyClipboard() {
+      // Reutiliza exactamente la misma lógica estructurada del exportTxt para que el portapapeles sea compatible
       let c = `${this.localSong.title}|BPM:${this.localSong.bpm}|TS:${this.localSong.timeSignature}\n`;
-      this.localSong.measures.forEach(m => c += m.text + '\n');
-      navigator.clipboard.writeText(c).then(() => this.showStatus('✔ Copiado al portapapeles'));
+      const timelineData = this.localSong.timeline ? JSON.stringify(this.localSong.timeline) : '[]';
+      c += `#TIMELINE:${timelineData}\n`;
+      
+      this.localSong.measures.forEach(m => {
+        c += `${m.id}|${m.text}\n`;
+      });
+      
+      navigator.clipboard.writeText(c).then(() => this.showStatus('✔ Copiado al portapapeles con estructura'));
     },
 
     importTxt(e) {
       const file = e.target.files[0]; if (!file) return;
       const r = new FileReader();
       r.onload = ev => {
-        const lines = ev.target.result.split('\n'), h = lines[0].split('|');
+        const lines = ev.target.result.split('\n');
+        const h = lines[0].split('|');
+        
         if (h.length >= 3) {
           this.localSong.title = h[0];
           this.localSong.bpm = parseFloat(h[1].split(':')[1]);
           this.localSong.timeSignature = h[2].split(':')[1];
         }
+        
         this.localSong.measures = [];
+        this.localSong.timeline = [];
+        
+        // Procesamos el resto de líneas
         for (let i = 1; i < lines.length; i++) {
-          if (lines[i].trim()) this.localSong.measures.push({ id: Date.now() + i, text: lines[i].trim() });
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          // Detectar la línea del patrón/timeline
+          if (line.startsWith('#TIMELINE:')) {
+            try {
+              const jsonStr = line.replace('#TIMELINE:', '');
+              this.localSong.timeline = JSON.parse(jsonStr);
+            } catch (err) {
+              this.localSong.timeline = [];
+            }
+          } else {
+            // Es una línea de compás. Intentamos separar ID y Texto
+            const parts = line.split('|');
+            if (parts.length >= 2) {
+              this.localSong.measures.push({
+                id: parts[0], // Recupera su ID original para mantener los vínculos del timeline intactos
+                text: parts.slice(1).join('|') // Por si el texto del compás contenía barras por alguna razón
+              });
+            } else if (parts.length === 1) {
+              // Fallback por si importas un TXT antiguo que no tenía IDs guardados
+              this.localSong.measures.push({
+                id: 'm-' + Math.random().toString(36).substr(2, 9),
+                text: parts[0]
+              });
+            }
+          }
         }
+        
         this.emit();
       };
       r.readAsText(file);
     },
 
     exportMidi() {
-      const { melody, harmony } = Parser.parseMeasures(
-        this.localSong.measures.map(m => m.text),
-        this.localSong.bpm
-      );
+      // --- CONSTRUCCIÓN DEL FLUJO DE COMPASES SEGÚN EL PATRÓN (TIMELINE) ---
+      let targetMeasuresText = [];
+
+      if (this.localSong.timeline && this.localSong.timeline.length > 0) {
+        // Recorremos el timeline para ordenar y repetir los textos de los compases adecuadamente
+        this.localSong.timeline.forEach(block => {
+          const matchedMeasure = this.localSong.measures.find(m => m.id === block.measureId);
+          if (matchedMeasure) {
+            targetMeasuresText.push(matchedMeasure.text);
+          }
+        });
+      }
+
+      // Fallback: Si el timeline está vacío, exportamos la lista de compases lineal por defecto
+      if (targetMeasuresText.length === 0) {
+        targetMeasuresText = this.localSong.measures.map(m => m.text);
+      }
+
+      // El Parser ahora procesa la cadena ordenada/repetida final generada por el patrón
+      const { melody, harmony } = Parser.parseMeasures(targetMeasuresText, this.localSong.bpm);
+      
       const bytes = MidiExport.exportToMidi({
         title: this.localSong.title,
         bpm: this.localSong.bpm,
@@ -530,11 +599,14 @@ playSingleMeasure(measureData) {
         includeHarmony: true,
         separateChannels: false
       });
+      
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([bytes], { type: 'audio/midi' }));
-      a.download = `${this.localSong.title}.mid`; a.click();
-      this.showStatus('✔ MIDI exportado');
+      a.download = `${this.localSong.title}.mid`; 
+      a.click();
+      this.showStatus('✔ MIDI exportado siguiendo el patrón');
     },
+
 
     exportPartitura() {
       try {

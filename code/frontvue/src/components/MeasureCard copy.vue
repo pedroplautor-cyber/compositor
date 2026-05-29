@@ -48,7 +48,7 @@
         <button class="mini-btn duplicate-btn" @click="duplicateMeasure(index)" title="Duplicar">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="9" y="9" width="13" height="13" rx="1" ry="1"></rect>
-            <path d="M5 15H4a1 1  0 0 1-1-1V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"></path>
+            <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v1"></path>
           </svg>
         </button>
         
@@ -70,60 +70,6 @@
         Añadir compás
       </button>
     </div>
-
-    <div class="timeline-section">
-      <div class="timeline-header">
-        <h3>Estructura y Patrón de la Canción</h3>
-        <div class="timeline-actions">
-          <select @change="addMeasureToTimeline($event.target.value); $event.target.value = ''" class="timeline-select">
-            <option value="" disabled selected>+ Añadir compás al patrón...</option>
-            <option v-for="(m, idx) in localSong.measures" :key="m.id" :value="m.id">
-              Compás {{ idx + 1 }} ({{ m.text.substring(0, 15) }}{{ m.text.length > 15 ? '...' : '' }})
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="timeline-grid" v-if="localSong.timeline && localSong.timeline.length > 0">
-        <div 
-          v-for="(block, index) in localSong.timeline" 
-          :key="index" 
-          class="timeline-block" 
-          :style="{ borderTopColor: block.color || '#64748b' }"
-        >
-          <div class="block-meta">
-            <span class="block-index">#{{ getMeasureIndexById(block.measureId) + 1 }}</span>
-            <div class="block-order-btns">
-              <button @click="moveTimelineBlock(index, -1)" :disabled="index === 0" title="Mover izquierda">‹</button>
-              <button @click="moveTimelineBlock(index, 1)" :disabled="index === localSong.timeline.length - 1" title="Mover derecha">›</button>
-              <button @click="removeTimelineBlock(index)" class="block-del" title="Quitar del patrón">×</button>
-            </div>
-          </div>
-
-          <input 
-            type="text" 
-            v-model="block.label" 
-            placeholder="Sección..." 
-            class="block-label-input"
-            @input="emit"
-          />
-
-          <div class="block-color-picker">
-            <span 
-              v-for="color in sectionColors" 
-              :key="color" 
-              :class="['color-dot', { active: block.color === color }]"
-              :style="{ backgroundColor: color }"
-              @click="block.color = color; emit()"
-            ></span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="timeline-empty">
-        El patrón está vacío. Añade compases arriba para estructurar el orden de la canción.
-      </div>
-    </div>
-
   </div>
 </template>
 
@@ -141,10 +87,8 @@ export default {
 
   data() {
     return {
-      localSong: this.ensureTimelineStructure(this.song),
-      draggedIndex: null,
-      // Paleta de colores suaves para las secciones musicales
-      sectionColors: ['#f87171', '#fb923c', '#facc15', '#4ade80', '#60a5fa', '#c084fc', '#f472b6']
+      localSong: JSON.parse(JSON.stringify(this.song)),
+      draggedIndex: null
     };
   },
 
@@ -152,25 +96,13 @@ export default {
     song: {
       deep: true,
       handler(newSong) {
-        this.localSong = this.ensureTimelineStructure(newSong);
+        this.localSong = JSON.parse(JSON.stringify(newSong));
       }
     }
   },
 
   methods: {
-    // Asegura que la nueva sección de datos exista siempre de forma segura
-    ensureTimelineStructure(songObj) {
-      const cloned = JSON.parse(JSON.stringify(songObj));
-      if (!cloned.timeline) {
-        cloned.timeline = [];
-      }
-      return cloned;
-    },
-
     emit() {
-
-      //alert(JSON.stringify(this.localSong))
-
       this.$emit('update:song', JSON.parse(JSON.stringify(this.localSong)));
     },
 
@@ -206,10 +138,7 @@ export default {
     },
 
     removeMeasure(index) {
-      const targetId = this.localSong.measures[index].id;
       this.localSong.measures.splice(index, 1);
-      // Limpiar del patrón los bloques asociados al compás eliminado
-      this.localSong.timeline = this.localSong.timeline.filter(b => b.measureId !== targetId);
       this.emit();
     },
     
@@ -225,42 +154,13 @@ export default {
       
       this.draggedIndex = null;
       this.emit();
-    },
-
-    // Métodos específicos para el Gestor del Patrón (Timeline)
-    getMeasureIndexById(id) {
-      return this.localSong.measures.findIndex(m => m.id === id);
-    },
-
-    addMeasureToTimeline(measureId) {
-      this.localSong.timeline.push({
-        measureId: measureId,
-        label: '',
-        color: this.sectionColors[0]
-      });
-      this.emit();
-    },
-
-    removeTimelineBlock(index) {
-      this.localSong.timeline.splice(index, 1);
-      this.emit();
-    },
-
-    moveTimelineBlock(index, direction) {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= this.localSong.timeline.length) return;
-      
-      const block = this.localSong.timeline[index];
-      this.localSong.timeline.splice(index, 1);
-      this.localSong.timeline.splice(targetIndex, 0, block);
-      this.emit();
     }
   }
 };
 </script>
 
 <style scoped>
-/* CSS Existente intacto */
+/* Tu CSS se mantiene exactamente igual */
 .measures-list-wrapper { width: 100%; }
 .measure-row-container { display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 12px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); transition: all 0.15s ease; }
 .measure-row-container:hover { border-color: #cbd5e1; background: #f8fafc; }
@@ -285,27 +185,4 @@ export default {
 .add-new-container { display: flex; justify-content: center; margin-top: 12px; margin-bottom: 8px; }
 .add-new-btn { display: flex; align-items: center; gap: 6px; background: #f1f5f9; border: 1px dashed #cbd5e1; padding: 8px 16px; border-radius: 6px; color: #475569; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .add-new-btn:hover { background: #e2e8f0; border-color: #94a3b8; color: #0f172a; }
-
-/* NUEVOS ESTILOS PARA EL GRID DE PATRONES */
-.timeline-section { margin-top: 28px; padding-top: 20px; border-top: 2px dashed #e2e8f0; }
-.timeline-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.timeline-header h3 { font-size: 0.95rem; font-weight: 700; color: #334155; margin: 0; }
-.timeline-select { padding: 5px 10px; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #475569; outline: none; cursor: pointer; }
-.timeline-grid { display: flex; flex-wrap: wrap; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; min-height: 80px; }
-.timeline-block { display: flex; flex-direction: column; justify-content: space-between; background: #ffffff; border: 1px solid #e2e8f0; border-top: 4px solid #64748b; border-radius: 6px; width: 110px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.block-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.block-index { font-size: 0.75rem; font-weight: 800; color: #475569; }
-.block-order-btns { display: flex; gap: 2px; }
-.block-order-btns button { background: #f1f5f9; border: none; font-size: 0.7rem; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 3px; cursor: pointer; color: #64748b; }
-.block-order-btns button:hover:not(:disabled) { background: #cbd5e1; color: #0f172a; }
-.block-order-btns button:disabled { opacity: 0.3; cursor: not-allowed; }
-.block-order-btns button.block-del { color: #ef4444; }
-.block-order-btns button.block-del:hover { background: #fee2e2; }
-.block-label-input { width: 100%; border: none; border-bottom: 1px solid #f1f5f9; font-size: 0.75rem; font-weight: 600; padding: 2px 0; outline: none; color: #1e293b; text-align: center; }
-.block-label-input:focus { border-bottom-color: #94a3b8; }
-.block-color-picker { display: flex; justify-content: center; gap: 3px; margin-top: 6px; }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; cursor: pointer; transition: transform 0.1s; border: 1px solid transparent; }
-.color-dot:hover { transform: scale(1.3); }
-.color-dot.active { border-color: #0f172a; transform: scale(1.1); }
-.timeline-empty { font-size: 0.8rem; color: #94a3b8; text-align: center; padding: 24px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc; }
 </style>
