@@ -37,8 +37,11 @@ import Parser from '@/utils/parser.js';
 import AudioEngine from '@/utils/audio.js';
 
 export default {
-  name: 'PlaybackScreen',
-  props: ['song', 'active'],
+  name: 'PlayerPiano',
+  props: {
+    song: { type: Object, required: true },
+    active: { type: Boolean, required: true }
+  },
   emits: ['stop'],
 
   data() {
@@ -53,9 +56,7 @@ export default {
       // CONFIGURACIÓN PARA 5 OCTAVAS (C2 a B6)
       startMidi: 36,  // C2
       endMidi: 95,    // B6
-      totalNotes: 60, // 5 octavas * 12 notas
-      
-      whiteNotesInOctave: [0, 2, 4, 5, 7, 9, 11], 
+      totalNotes: 60, 
       blackNotesInOctave: [1, 3, 6, 8, 10]   
     };
   },
@@ -63,11 +64,9 @@ export default {
   watch: {
     active(val) {
       if (val) {
-        // Doble ráfaga de ticks para asegurar que el DOM del v-if esté 100% renderizado con sus estilos CSS finales
+        // Doble ráfaga de ticks para asegurar el renderizado correcto del DOM mediante v-if
         this.$nextTick(() => {
-          setTimeout(() => {
-            this.start();
-          }, 50);
+          setTimeout(() => this.start(), 50);
         });
       } else {
         this.stop();
@@ -82,73 +81,35 @@ export default {
     },
 
     isBlackKey(midiNumber) {
-      const noteInOctave = midiNumber % 12;
-      return this.blackNotesInOctave.includes(noteInOctave);
+      return this.blackNotesInOctave.includes(midiNumber % 12);
     },
 
-    async __start() {
+    start() {
       this.stop();
 
-      if (!this.song || !this.song.timeline || this.song.timeline.length === 0) {
-        this.notesTimeline = [];
-        this.currentSectionLabel = '';
-        return; 
-      }
+      if (!this.song || !this.song.measures) return;
 
-      // 1. Inicialización segura del AudioContext
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       this.audioCtx = new AudioContextClass();
       const ctx = this.audioCtx;
-
-      // SOLUCIÓN AL AUTOPLAY: Si el contexto nace suspendido (común en arranques automáticos), intentamos despertarlo
-      if (ctx.state === 'suspended') {
-        await ctx.resume().catch(err => console.log("AudioContext en espera de interacción de usuario:", err));
-      }
       
-      const lookAheadDelay = 0.5; // Bajado a 0.5 para reducir latencia inicial percibida
+      const lookAheadDelay = 1.0; 
       this.audioStartTime = ctx.currentTime + lookAheadDelay; 
 
       const bpm = this.song.bpm || 120;
+      const { melody, harmony } = Parser.parseMeasures(
+        this.song.measures.map(m => m.text), 
+        bpm
+      );
       
-      let targetMeasuresText = [];
-      let blockMetadataMap = []; 
-
-      this.song.timeline.forEach((block) => {
-        const matchedMeasure = this.song.measures?.find(m => m.id === block.measureId);
-        if (matchedMeasure) {
-          targetMeasuresText.push(matchedMeasure.text);
-          blockMetadataMap.push({
-            label: block.label || '',
-            color: block.color || null
-          });
-        }
-      });
-
-      if (targetMeasuresText.length === 0) return;
-
-      const { melody, harmony } = Parser.parseMeasures(targetMeasuresText, bpm);
       this.notesTimeline = [];
-      
-      // 2. Procesar Melodía Principal
+
+      // 1. Melodía Principal
       let melodyTimeOffset = 0;
-      if (melody && melody.length > 0) {
-        melody.forEach((measure, measureIndex) => {
-          if (!measure || !Array.isArray(measure)) return;
-
-          const currentBlockMeta = blockMetadataMap[measureIndex] || { label: '', color: null };
-          let currentMeasureStart = melodyTimeOffset;
-          
-          let totalMeasureDuration = 0;
+      if (melody) {
+        melody.forEach((measure) => {
+          if (!measure) return;
           measure.forEach((note) => {
-            if (note && typeof note.duration === 'number') {
-              totalMeasureDuration += note.duration;
-            }
-          });
-          let currentMeasureEnd = currentMeasureStart + totalMeasureDuration;
-
-          measure.forEach((note) => {
-            if (!note) return;
-            
             const noteStartAudioTime = this.audioStartTime + melodyTimeOffset;
             const notesArray = note.isChord ? note.notes : [note];
 
@@ -160,16 +121,13 @@ export default {
                   while (midi > this.endMidi) midi -= 12;
 
                   const cleanName = n.name ? n.name.replace(/[0-9<>._-]/g, '') : 'C';
-                  const color = currentBlockMeta.color || (Parser.NOTE_COLORS ? Parser.NOTE_COLORS[cleanName] : '#4ade80');
+                  const color = Parser.NOTE_COLORS?.[cleanName] || '#4ade80';
 
                   this.notesTimeline.push({
                     midi,
                     start: melodyTimeOffset, 
                     duration: note.duration || 0,
-                    color: color,
-                    label: currentBlockMeta.label, 
-                    measureStart: currentMeasureStart,
-                    measureEnd: currentMeasureEnd
+                    color: color
                   });
                 }
                 AudioEngine.createMelodySound(ctx, n.freq, noteStartAudioTime, note.duration || 0, 0.15,
@@ -181,17 +139,12 @@ export default {
         });
       }
 
-      // 3. Procesar Armonía Estructural
+      // 2. Armonía
       let harTimeOffset = 0;
-      if (harmony && harmony.length > 0) {
-        harmony.forEach((measure, measureIndex) => {
-          if (!measure || !Array.isArray(measure)) return;
-
-          const currentBlockMeta = blockMetadataMap[measureIndex] || { label: '', color: null };
-          
+      if (harmony) {
+        harmony.forEach((measure) => {
+          if (!measure) return;
           measure.forEach((note) => {
-            if (!note) return;
-
             const noteStartAudioTime = this.audioStartTime + harTimeOffset;
             const notesArray = note.isChord ? note.notes : [note];
 
@@ -202,14 +155,11 @@ export default {
                   while (midi < this.startMidi) midi += 12;
                   while (midi > this.endMidi) midi -= 12;
 
-                  const color = currentBlockMeta.color || '#2563eb';
-
                   this.notesTimeline.push({
                     midi,
                     start: harTimeOffset,
                     duration: note.duration || 0,
-                    color: color,
-                    label: currentBlockMeta.label
+                    color: '#2563eb' 
                   });
                 }
                 AudioEngine.createMelodySound(ctx, n.freq, noteStartAudioTime, note.duration || 0, 0.10,
@@ -221,130 +171,10 @@ export default {
         });
       }
 
-      // Asegurar redimensionamiento inicial del Canvas
       this.resizeCanvas();
       window.addEventListener('resize', this.resizeCanvas);
       this.animate();
     },
-
-
-    start() {
-
-      //alert(JSON.stringify(this.song))
-
-      this.stop();
-
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      this.audioCtx = new AudioContextClass();
-      const ctx = this.audioCtx;
-      
-      const lookAheadDelay = 1.0; 
-      this.audioStartTime = ctx.currentTime + lookAheadDelay; 
-
-      
-      const bpm = this.song.bpm;
-      const { melody, harmony } = Parser.parseMeasures(
-        this.song.measures.map(m => m.text), bpm
-      );
-      
-
-      
-      /*
-        {"title":"DEMO TÉCNICA","bpm":100,"timeSignature":"4/4","bandMode":"duet","melodyTimbre":"triangle","percKit":"classic","customImageSrc":null,
-        "measures":[{"id":1,"text":"do4 re4 mi4 fa4 | [<do <re]2 >mi2"}],
-        "timeline":[{"measureId":"1","label":"","color":"#f87171"}]}
-
-      */
-
-      /*
-      const bpm = this.song.bpm;
-
-      // 1. Reconstruimos el orden de los compases según el timeline
-      const orderedMeasureTexts = this.song.timeline.map(timelineItem => {
-        // Buscamos el compás en 'measures' que coincida con el 'measureId' del timeline
-        // Nota: Convertimos a String por si acaso los IDs difieren en tipo (número vs string)
-        const measure = this.song.measures.find(m => String(m.id) === String(timelineItem.measureId));
-        
-        // Si existe, devolvemos su texto; si no, devolvemos un compás vacío (o un string vacío)
-        return measure ? measure.text : "";
-      });
-
-      // 2. Pasamos el array ordenado según el timeline al Parser
-      const { melody, harmony } = Parser.parseMeasures(orderedMeasureTexts, bpm);
-
-
-      this.notesTimeline = [];
-      */
-
-      // 1. Melodía Principal
-      let melodyTimeOffset = 0;
-      melody.forEach((measure) => {
-        measure.forEach((note) => {
-          const noteStartAudioTime = this.audioStartTime + melodyTimeOffset;
-          const notesArray = note.isChord ? note.notes : [note];
-
-          notesArray.forEach(n => {
-            if (n && !n.isRest && n.freq > 0) {
-              let midi = this.freqToMidi(n.freq);
-              if (midi) {
-                while (midi < this.startMidi) midi += 12;
-                while (midi > this.endMidi) midi -= 12;
-
-                const cleanName = n.name ? n.name.replace(/[0-9<>._-]/g, '') : 'C';
-                const color = Parser.NOTE_COLORS[cleanName] || '#4ade80';
-
-                this.notesTimeline.push({
-                  midi,
-                  start: melodyTimeOffset, 
-                  duration: note.duration,
-                  color: color
-                });
-              }
-              AudioEngine.createMelodySound(ctx, n.freq, noteStartAudioTime, note.duration, 0.15,
-                this.song.melodyTimbre, this.song.bandMode);
-            }
-          });
-          melodyTimeOffset += note.duration;
-        });
-      });
-
-      // 2. Armonía
-      let harTimeOffset = 0;
-      if (harmony && harmony.length > 0) {
-        harmony.forEach((measure) => {
-          measure.forEach((note) => {
-            const noteStartAudioTime = this.audioStartTime + harTimeOffset;
-            const notesArray = note.isChord ? note.notes : [note];
-
-            notesArray.forEach(n => {
-              if (n && !n.isRest && n.freq > 0) {
-                let midi = this.freqToMidi(n.freq);
-                if (midi) {
-                  while (midi < this.startMidi) midi += 12;
-                  while (midi > this.endMidi) midi -= 12;
-
-                  this.notesTimeline.push({
-                    midi,
-                    start: harTimeOffset,
-                    duration: note.duration,
-                    color: '#2563eb' 
-                  });
-                }
-                AudioEngine.createMelodySound(ctx, n.freq, noteStartAudioTime, note.duration, 0.10,
-                  this.song.melodyTimbre, this.song.bandMode);
-              }
-            });
-            harTimeOffset += note.duration;
-          });
-        });
-      }
-
-      this.resizeCanvas();
-      window.addEventListener('resize', this.resizeCanvas);
-      this.animate();
-    },
-
-
 
     resizeCanvas() {
       const canvas = this.$refs.pianoCanvas;
@@ -354,7 +184,6 @@ export default {
       const width = container.clientWidth;
       const height = container.clientHeight;
       
-      // Prevenir asignaciones de tamaño 0 si los contenedores aún colapsan en el DOM
       if (width > 0 && height > 0) {
         canvas.width = width;
         canvas.height = height;
@@ -394,25 +223,20 @@ export default {
       this.notesTimeline.forEach(note => {
         if (songCurrentTime >= note.start && songCurrentTime <= (note.start + note.duration)) {
           this.activeNotes.add(note.midi);
-          if (note.label) {
-            activeSection = note.label;
-          }
+          if (note.label) activeSection = note.label;
         }
       });
 
       this.currentSectionLabel = activeSection;
 
-      // Helper optimizado de cálculo posicional
       const getXPositionOfMidi = (midi) => {
         let whiteKeyIndex = 0;
         for (let m = this.startMidi; m < midi; m++) {
           if (!this.isBlackKey(m)) whiteKeyIndex++;
         }
-        if (this.isBlackKey(midi)) {
-          return (whiteKeyIndex * whiteKeyWidth) - (blackKeyWidth / 2);
-        } else {
-          return whiteKeyIndex * whiteKeyWidth;
-        }
+        return this.isBlackKey(midi)
+          ? (whiteKeyIndex * whiteKeyWidth) - (blackKeyWidth / 2)
+          : whiteKeyIndex * whiteKeyWidth;
       };
 
       // 1. Renderizar bloques de la cascada
@@ -432,8 +256,7 @@ export default {
           ctx.rect(0, 0, W, waterfallHeight);
           ctx.clip();
 
-          const isActive = this.activeNotes.has(note.midi);
-          if (isActive) {
+          if (this.activeNotes.has(note.midi)) {
             ctx.shadowBlur = 10;
             ctx.shadowColor = note.color;
           }
@@ -507,17 +330,16 @@ export default {
       ctx.stroke();
     },
 
-    // Al hacer click explícito en reiniciar, el navegador garantiza que el sonido funcione sí o sí
     async restart() { 
       if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        await this.audioCtx.resume();
+        await this.audioCtx.resume().catch(() => {});
       }
       this.start(); 
     },
 
     stop() {
       if (this.audioCtx) {
-        try { this.audioCtx.close(); } catch(e) {console.log("error")}
+        try { this.audioCtx.close(); } catch { /** Silenciar errores de cierre */ }
         this.audioCtx = null; 
       }
       if (this.animationFrameId) { 
@@ -530,7 +352,9 @@ export default {
     }
   },
 
-  beforeUnmount() { this.stop(); }
+  beforeUnmount() { 
+    this.stop(); 
+  }
 };
 </script>
 

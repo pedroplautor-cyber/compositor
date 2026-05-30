@@ -185,11 +185,20 @@
       </div>
     </transition>
 
-    <!-- PIE ESTÁTICO DE REPRODUCCIÓN GLOBAL -->
     <div class="sticky-bottom-action">
-      <button class="btn-play-main" @click="$emit('play')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;"><path d="M8 5v14l11-7z"/></svg>
-        Reproducir Proyecto (Global)
+      <div class="player-selector-wrap">
+        <select v-model="playerType" class="select-player-type">
+          <option value="piano">Piano</option>
+          <option value="banda">Banda</option>
+          <option value="himno">Himno</option>
+        </select>
+      </div>
+
+      <button class="btn-play-main" @click="$emit('play', playerType)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        Reproducir
       </button>
     </div>
 
@@ -219,6 +228,7 @@ export default {
       pixelRes: '8',
       statusMsg: '',
       statusTimer: null,
+      playerType: 'piano',
     };
   },
 
@@ -1120,4 +1130,59 @@ select {
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
+
+
+
+.sticky-bottom-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #111726; /* Sincronizado con var(--color-surface) */
+  border-top: 1px solid #1e293b;
+}
+
+.player-selector-wrap {
+  flex: 0 0 180px; /* Ancho fijo para el desplegable */
+}
+
+.select-player-type {
+  width: 100%;
+  padding: 12px;
+  background-color: #1e293b;
+  color: #f3f4f6;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.select-player-type:focus {
+  border-color: #6366f1; /* Color primario índigo */
+}
+
+.btn-play-main {
+  flex: 1; /* El botón de reproducción toma el resto del espacio disponible */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #6366f1;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-play-main:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
 </style>

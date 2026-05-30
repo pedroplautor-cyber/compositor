@@ -6,6 +6,7 @@
     </div>
     
     <div class="nav-tabs">
+      <!-- Pestañas estáticas (Editor y Partitura) -->
       <button
         v-for="tab in tabs" 
         :key="tab.id"
@@ -17,45 +18,28 @@
         <span class="tab-text">{{ tab.label }}</span>
       </button>
 
-      <div 
-        class="dropdown-container"
-        @mouseleave="closeDropdown"
-      >
-        <button 
-          :class="['nav-tab', isDropdownOpen ? 'active' : '']"
-          @click="toggleDropdown"
-          aria-haspopup="true"
-          :aria-expanded="isDropdownOpen"
-        >
-          <span class="tab-icon">🛠️</span>
-          <span class="tab-text">Herramientas</span>
-          <span class="arrow-icon" :class="{ 'rotated': isDropdownOpen }">▼</span>
-        </button>
 
-        <div v-if="isDropdownOpen" class="dropdown-menu">
-          <button 
-            class="dropdown-item" 
-            @click="selectTool('partitura')"
+        <div class="select-container">
+          <span class="select-icon">▶️</span>
+          
+          <select 
+            :value="screen" 
+            @change="onPlayerSelect($event)"
+            class="nav-select"
+            :class="{ 'active': screen === 'playerPiano' || screen === 'playerBanda' }"
+            aria-label="Seleccionar Reproductor"
           >
-            <span class="tab-icon">📄</span>
-            <span class="tab-text">Ver partitura</span>
-          </button>
-          <button 
-            class="dropdown-item" 
-            @click="selectTool('transponer')"
-          >
-            <span class="tab-icon">🔄</span>
-            <span class="tab-text">Transponer</span>
-          </button>
-          <button 
-            class="dropdown-item" 
-            @click="selectTool('limpiar')"
-          >
-            <span class="tab-icon">🗑️</span>
-            <span class="tab-text">Limpiar Lienzo</span>
-          </button>
+            <option value="" disabled v-if="screen !== 'playerPiano' && screen !== 'playerBanda'">
+              Reproductor
+            </option>
+            
+            <option value="playerPiano">🎹 Modo Piano</option>
+            <option value="playerBanda">🎺 Modo Banda</option>
+          </select>
         </div>
-      </div>
+
+
+
     </div>
   </nav>
 </template>
@@ -67,15 +51,15 @@ export default {
     screen: { type: String, required: true },
     title: { type: String, default: 'Mi App' }
   },
-  emits: ['go', 'tool-action'],
+  // Se declara el nuevo evento 'player-change'
+  emits: ['go', 'player-change'],
   
   data() {
     return {
       isDropdownOpen: false,
       tabs: [        
         { id: 'editor', label: 'Editor', icon: '✏️', ariaLabel: 'Ir al Editor' },
-        { id: 'partitura', label: 'Partitura', icon: '📄', ariaLabel: 'Ir a la partitura' },
-        { id: 'playback', label: 'Play', icon: '▶️', ariaLabel: 'Ir a Reproducción' }
+        { id: 'partitura', label: 'Partitura', icon: '📄', ariaLabel: 'Ir a la partitura' }
       ]
     };
   },
@@ -83,11 +67,21 @@ export default {
     toggleDropdown() {
       this.isDropdownOpen = !this.isDropdownOpen;
     },
+
+  onPlayerSelect(event) {
+    const playerType = event.target.value;
+    if (playerType) {
+      this.$emit('player-change', playerType);
+    }
+  },
+
+
     closeDropdown() {
       this.isDropdownOpen = false;
     },
-    selectTool(actionId) {
-      this.$emit('tool-action', actionId);
+    selectPlayer(playerType) {
+      // Emite el cambio al contenedor padre
+      this.$emit('player-change', playerType);
       this.closeDropdown();
     }
   }
@@ -221,7 +215,6 @@ export default {
   animation: fadeIn 0.15s ease-out;
 }
 
-/* Unificado con la estética del .nav-tab original */
 .dropdown-item {
   display: flex;
   align-items: center;
@@ -244,12 +237,19 @@ export default {
   background: rgba(212, 175, 55, 0.15);
 }
 
+/* Estado visual para identificar cuál reproductor está activo dentro del menú */
+.dropdown-item.selected {
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.1);
+  font-weight: 600;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Ajustes móviles (Afecta automáticamente a los ítems del dropdown gracias al cambio de clase) */
+/* Ajustes móviles */
 @media (max-width: 480px) {
   .tab-text {
     display: none;
@@ -265,4 +265,68 @@ export default {
     margin-left: 0;
   }
 }
+
+
+.select-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: transparent;
+}
+
+.select-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 13px;
+  pointer-events: none; /* Evita que bloquee los clics en el select */
+  opacity: 0.8;
+}
+
+.nav-select {
+  padding: 6px 14px 6px 32px; /* Espacio extra a la izquierda para el icono */
+  font-size: 13px;
+  font-weight: 500;
+  color: #888;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-appearance: none; /* Oculta la flecha nativa del sistema */
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Estilo para simular que hay una flecha al final (opcional) */
+.select-container::after {
+  content: "▼";
+  font-size: 9px;
+  color: #888;
+  position: absolute;
+  right: 10px;
+  pointer-events: none;
+}
+
+.nav-select:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Se activa si el reproductor actual en "screen" coincide */
+.nav-select.active {
+  border-color: rgba(212, 175, 55, 0.4); 
+  color: #d4af37; 
+  background: rgba(212, 175, 55, 0.1); 
+  font-weight: 600;
+}
+
+/* Estilo para las opciones internas dentro del menú desplegable */
+.nav-select option {
+  background: #141414;
+  color: #b3b3b3;
+  padding: 8px;
+}
+
+
 </style>

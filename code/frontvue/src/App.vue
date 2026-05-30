@@ -4,7 +4,7 @@
       :screen="screen" 
       :title="song.title" 
       @go="navigate" 
-      @tool-action="handleToolAction" 
+      @player-change="handlePlayerChange" 
     />
     
     <div class="screen-container">
@@ -15,13 +15,20 @@
         @play="startPlayback"
       />
       
-      <PlaybackScreen
-        v-show="screen === 'playback'"
+      <PlayerPiano
+        v-show="screen === 'playerPiano'"
         :song="song"
-        :active="screen === 'playback'"
+        :active="screen === 'playerPiano'"
         @stop="stopPlayback"
       />
       
+      <PlayerBanda
+        v-show="screen === 'playerBanda'"
+        :song="song"
+        :active="screen === 'playerBanda'"
+        @stop="stopPlayback"
+      />
+
       <ComponentePartitura
         v-show="screen === 'partitura'"
         :song="song"
@@ -35,7 +42,8 @@
 <script>
 import NavBar from './components/NavBar.vue';
 import EditorScreen from './components/EditorScreen.vue';
-import PlaybackScreen from './components/PlaybackScreen.vue';
+import PlayerPiano from './components/PlayerPiano.vue';
+import PlayerBanda from './components/PlayerBanda.vue';
 import ComponentePartitura from './components/ComponentePartitura.vue';
 
 export default {
@@ -43,7 +51,8 @@ export default {
   components: { 
     NavBar, 
     EditorScreen, 
-    PlaybackScreen,
+    PlayerPiano,
+    PlayerBanda,
     ComponentePartitura
   },
   data() {
@@ -65,16 +74,26 @@ export default {
   },
   methods: {
     navigate(id) {
-      if (id === 'playback') { this.startPlayback(); return; }
+      // Si navega a playerPiano de forma directa, activa la reproducción
+      if (id === 'playerPiano' || id === 'playerBanda') { 
+        this.screen = id;
+        return; 
+      }
       this.screen = id;
     },
-    handleToolAction(actionId) {
-      if (actionId === 'partitura') {
-        this.screen = 'partitura';
+    // Nuevo método para manejar la selección entre playerPiano y playerBanda
+    handlePlayerChange(playerType) {
+      if (playerType === 'playerPiano' || playerType === 'playerBanda') {
+        this.screen = playerType;
       }
     },
-    startPlayback() { this.screen = 'playback'; },
-    stopPlayback() { this.screen = 'editor'; }
+    startPlayback() { 
+      // Por defecto va al playerPiano al darle a play desde el editor
+      this.screen = 'playerPiano'; 
+    },
+    stopPlayback() { 
+      this.screen = 'editor'; 
+    }
   }
 };
 </script>
@@ -84,20 +103,20 @@ export default {
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh; /* Ocupa al menos el 100% de la pantalla */
+  min-height: 100vh;
 }
 
 /* Contenedor que envuelve a los componentes hijos/pantallas */
 .screen-container {
-  flex-grow: 1; /* Ocupa todo el espacio restante debajo del NavBar */
+  flex-grow: 1;
   display: flex;
   flex-direction: column;
 }
 
-/* Aplica la altura mínima a cualquier componente hijo directo dentro del contenedor */
+/* Aplica la altura mínima a cualquier componente hijo directo */
 .screen-container > * {
   flex-grow: 1;
-  min-height: 400px; /* 👈 MODIFICA ESTE VALOR con la altura mínima que desees (ej: 400px, 60vh, etc.) */
+  min-height: 400px;
   box-sizing: border-box;
 }
 </style>
