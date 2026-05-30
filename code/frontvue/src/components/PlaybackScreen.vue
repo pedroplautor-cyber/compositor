@@ -241,12 +241,12 @@ export default {
       const lookAheadDelay = 1.0; 
       this.audioStartTime = ctx.currentTime + lookAheadDelay; 
 
-      /*
+      
       const bpm = this.song.bpm;
       const { melody, harmony } = Parser.parseMeasures(
         this.song.measures.map(m => m.text), bpm
       );
-      */
+      
 
       
       /*
@@ -256,7 +256,7 @@ export default {
 
       */
 
-
+      /*
       const bpm = this.song.bpm;
 
       // 1. Reconstruimos el orden de los compases según el timeline
@@ -274,7 +274,7 @@ export default {
 
 
       this.notesTimeline = [];
-
+      */
 
       // 1. Melodía Principal
       let melodyTimeOffset = 0;
